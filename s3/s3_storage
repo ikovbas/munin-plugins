@@ -1,0 +1,88 @@
+#!/usr/bin/php
+
+<?php
+
+/* Buckets should be string with all buckets separated by space */
+$buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
+
+/**
+ * Function return size in bytes for the given bucket using aws shell command
+ *
+ * @param string $bucket The bucket name
+ * @return bool|int Return bucket size or false if something wrong
+ */
+function getBucketSize ($bucket) {
+    // Prepare command
+    $command = sprintf("aws s3api list-objects --bucket %s --output json --query \"sum(Contents[].Size)\"", $bucket);
+
+    // Run command and remove \n from end of the lone
+    $result = rtrim(shell_exec($command));
+
+    // Return false if something wrong or result if ok
+    return is_numeric($result) ? intval($result) : false;
+}
+
+/**
+ * Function try to read data from cache. If cache not found or expired use getBucketSize function to get actual value
+ *
+ * @param string $bucket The bucket name
+ * @return int Return bucket size
+ */
+function getBucketSizeFromCache ($bucket) {
+    $cachePeriodInSeconds   = 86400; // 24 * 60 * 60
+    $cacheFileName          = "/tmp/monitoring_munin_s3_storage_$bucket.json";
+
+    // We should read data from the cache if cache file exists and was modified les then $cachePeriodInSeconds seconds ago
+    $isCacheActual = file_exists($cacheFileName) && (time() - filemtime($cacheFileName) < $cachePeriodInSeconds);
+
+    // Read bucket size data from cache or get new one
+    if ($isCacheActual) {
+        $cachedData = intval(file_get_contents($cacheFileName));
+    } else {
+        $cachedData = getBucketSize($bucket); // Get bucket size
+        file_put_contents($cacheFileName, $cachedData); // Update cache
+    }
+
+    return intval($cachedData);
+}
+
+// Processed autoconf parameter
+if(count($argv) == 2 && $argv[1] == 'autoconf') {
+    // Check if buckets are specified
+    if (empty($buckets)) {
+        exit("no (no buckets specified)\n");
+    }
+
+    // Check if aws is installed
+    if (empty(shell_exec('which aws'))) {
+        exit("no (aws not installed)\n");
+    }
+
+    // Check if we can load bucket data
+    if  (getBucketSize($buckets[0]) === false) {
+        exit("no (Wrong aws configuration. Can't get bucket size)\n");
+    }
+
+    exit("yes\n");
+}
+
+// Processed config parameter
+if(count($argv) == 2 && $argv[1] == 'config') {
+
+    # The headers
+    echo("graph_title S3 Storage Usage\n");
+    echo("graph_category s3\n");
+    echo("graph_args --base 1024 -l 0\n");
+    echo("graph_vlabel bytes\n");
+
+    foreach ($buckets as $bucket) {
+        printf("%s.label Bucket %s\n", $bucket, $bucket);
+    }
+
+    exit();
+}
+
+// execute plugin
+foreach ($buckets as $bucket) {
+    echo $bucket . ".value " . getBucketSizeFromCache($bucket) . "\n";
+}
