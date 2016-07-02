@@ -1,5 +1,4 @@
 #!/usr/bin/php
-
 <?php
 
 /* Buckets should be string with all buckets separated by space */
@@ -76,7 +75,7 @@ if(count($argv) == 2 && $argv[1] == 'config') {
     echo("graph_vlabel bytes\n");
 
     foreach ($buckets as $bucket) {
-        printf("%s.label Bucket %s\n", $bucket, $bucket);
+        printf("%s.label Bucket %s\n", str_replace('.', '_', $bucket), $bucket);
     }
 
     exit();
@@ -84,5 +83,5 @@ if(count($argv) == 2 && $argv[1] == 'config') {
 
 // execute plugin
 foreach ($buckets as $bucket) {
-    echo $bucket . ".value " . getBucketSizeFromCache($bucket) . "\n";
+    echo str_replace('.', '_', $bucket) . ".value " . getBucketSizeFromCache($bucket) . "\n";
 }
