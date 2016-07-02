@@ -1,12 +1,17 @@
 #!/usr/bin/php
 <?php
 
+// Names of env variables
+const ENV_BUCKETS           = 'buckets';
+const ENV_AWS_FILE          = 'aws_file';
+const ENV_CACHE_PERIOD      = 's3_items_cache_period_in_seconds';
+
+const DEFAULT_CACHE_PERIOD  = 86400; // 24 * 60 * 60 (24 hours)
+
 /* Buckets should be string with all buckets separated by space */
-$buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
-$awsFile = empty(getenv('aws_file')) ? 'aws' : trim(getenv('aws_file'));
-$cachePeriodInSeconds = empty(getenv('s3_storage_cache_period_in_seconds'))
-    ? 86400 // 24 * 60 * 60 (24 hours)
-    : intval(getenv('s3_storage_cache_period_in_seconds'));
+$buckets = empty(getenv(ENV_BUCKETS)) ? [] : explode(' ', getenv(ENV_BUCKETS));
+$awsFile = empty(getenv(ENV_AWS_FILE)) ? 'aws' : trim(getenv(ENV_AWS_FILE));
+$cachePeriodInSeconds = empty(getenv(ENV_CACHE_PERIOD)) ? DEFAULT_CACHE_PERIOD : intval(getenv(ENV_CACHE_PERIOD));
 
 /**
  * Function return count of bucket items for the given bucket using aws shell command
