@@ -1,9 +1,12 @@
 #!/usr/bin/php
 <?php
 
-/* Buckets should be string with all buckets separated by space */
+// Buckets should be string with all buckets separated by space
 $buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
 $awsFile = empty(getenv('aws_file')) ? 'aws' : trim(getenv('aws_file'));
+$cachePeriodInSeconds = empty(getenv('s3_storage_cache_period_in_seconds'))
+    ? 86400 // 24 * 60 * 60 (24 hours)
+    : intval(getenv('s3_storage_cache_period_in_seconds'));
 
 /**
  * Function return size in bytes for the given bucket using aws shell command
@@ -15,7 +18,7 @@ function getBucketSize ($bucket) {
     global $awsFile;
 
     // Prepare command
-    $command = sprintf("$awsFile s3api list-objects --bucket %s --output json --query \"sum(Contents[].Size)\"", $bucket);
+    $command = sprintf("$awsFile s3api list-objects --bucket $bucket --output json --query \"sum(Contents[].Size)\"");
 
     // Run command and remove \n from end of the lone
     $result = rtrim(shell_exec($command));
@@ -31,7 +34,8 @@ function getBucketSize ($bucket) {
  * @return int Return bucket size
  */
 function getBucketSizeFromCache ($bucket) {
-    $cachePeriodInSeconds   = 86400; // 24 * 60 * 60
+    global $cachePeriodInSeconds;
+
     $cacheFileName          = "/tmp/monitoring_munin_s3_storage_$bucket.json";
 
     // We should read data from the cache if cache file exists and was modified les then $cachePeriodInSeconds seconds ago
