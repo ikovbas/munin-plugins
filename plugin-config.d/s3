@@ -1,0 +1,6 @@
+[s3_*]
+env.buckets stage.is1.stack.lordsoft.co dev.is1.stack.lordsoft.co tmp.stack.lordsoft.co logs.lordsoft.co
+env.s3_items_cache_period_in_seconds 86400
+env.s3_storage_cache_period_in_seconds 86400
+env.aws_file /usr/local/bin/aws
+user root
