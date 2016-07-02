@@ -1,0 +1,89 @@
+#!/usr/bin/php
+<?php
+
+/* Buckets should be string with all buckets separated by space */
+$buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
+$awsFile = empty(getenv('aws_file')) ? 'aws' : trim(getenv('aws_file'));
+
+/**
+ * Function return count of bucket items for the given bucket using aws shell command
+ *
+ * @param string $bucket The bucket name
+ * @return bool|int Return bucket items count or false if something wrong
+ */
+function getBucketItemsCount ($bucket) {
+    global $awsFile;
+
+    // Prepare command
+    $command = sprintf("$awsFile s3api list-objects --bucket %s --output json --query \"length(Contents[])\"", $bucket);
+
+    // Run command and remove \n from end of the lone
+    $result = rtrim(shell_exec($command));
+
+    // Return false if something wrong or result if ok
+    return is_numeric($result) ? intval($result) : false;
+}
+
+/**
+ * Function try to read data from cache. If cache not found or expired use getBucketItemsCount function to get actual value
+ *
+ * @param string $bucket The bucket name
+ * @return int Return bucket items count
+ */
+function getBucketItemsCountFromCache ($bucket) {
+    $cachePeriodInSeconds   = 86400; // 24 * 60 * 60
+    $cacheFileName          = "/tmp/monitoring_munin_s3_items_$bucket.json";
+
+    // We should read data from the cache if cache file exists and was modified les then $cachePeriodInSeconds seconds ago
+    $isCacheActual = file_exists($cacheFileName) && (time() - filemtime($cacheFileName) < $cachePeriodInSeconds);
+
+    // Read bucket items count data from cache or get new one
+    if ($isCacheActual) {
+        $cachedData = intval(file_get_contents($cacheFileName));
+    } else {
+        $cachedData = getBucketItemsCount($bucket); // Get actual bucket items count
+        file_put_contents($cacheFileName, $cachedData); // Update cache
+    }
+
+    return intval($cachedData);
+}
+
+// Processed autoconf parameter
+if(count($argv) == 2 && $argv[1] == 'autoconf') {
+    // Check if buckets are specified
+    if (empty($buckets)) {
+        exit("no (no buckets specified)\n");
+    }
+
+    // Check if aws is installed
+    if (empty(shell_exec("which $awsFile"))) {
+        exit("no (aws not installed)\n");
+    }
+
+    // Check if we can load bucket data
+    if  (getBucketItemsCount($buckets[0]) === false) {
+        exit("no (Wrong aws configuration. Can't get bucket items count)\n");
+    }
+
+    exit("yes\n");
+}
+
+// Processed config parameter
+if(count($argv) == 2 && $argv[1] == 'config') {
+
+    # The headers
+    echo("graph_title S3 Items\n");
+    echo("graph_category s3\n");
+    echo("graph_vlabel items\n");
+
+    foreach ($buckets as $bucket) {
+        printf("%s.label Bucket %s\n", str_replace('.', '_', $bucket), $bucket);
+    }
+
+    exit();
+}
+
+// execute plugin
+foreach ($buckets as $bucket) {
+    echo str_replace('.', '_', $bucket) . ".value " . getBucketItemsCountFromCache($bucket) . "\n";
+}
