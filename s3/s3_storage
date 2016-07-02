@@ -3,6 +3,7 @@
 
 /* Buckets should be string with all buckets separated by space */
 $buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
+$awsFile = empty(getenv('aws_file')) ? 'aws' : trim(getenv('aws_file'));
 
 /**
  * Function return size in bytes for the given bucket using aws shell command
@@ -11,8 +12,10 @@ $buckets = empty(getenv('buckets')) ? [] : explode(' ', getenv('buckets'));
  * @return bool|int Return bucket size or false if something wrong
  */
 function getBucketSize ($bucket) {
+    global $awsFile;
+
     // Prepare command
-    $command = sprintf("aws s3api list-objects --bucket %s --output json --query \"sum(Contents[].Size)\"", $bucket);
+    $command = sprintf("$awsFile s3api list-objects --bucket %s --output json --query \"sum(Contents[].Size)\"", $bucket);
 
     // Run command and remove \n from end of the lone
     $result = rtrim(shell_exec($command));
@@ -53,7 +56,7 @@ if(count($argv) == 2 && $argv[1] == 'autoconf') {
     }
 
     // Check if aws is installed
-    if (empty(shell_exec('which aws'))) {
+    if (empty(shell_exec("which $awsFile"))) {
         exit("no (aws not installed)\n");
     }
 
