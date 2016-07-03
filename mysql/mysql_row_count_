@@ -1,0 +1,87 @@
+#!/usr/bin/php
+<?php
+
+const DEFAULT_CACHE_PERIOD  = 86400; // 1 * 60 * 60 (1 hour)
+const DEFAULT_DEFAULTS_FILE = '/etc/mysql/debian.cnf';
+const DEFAULT_MYSQL_FILE    = 'mysql';
+
+$table          = str_replace('mysql_row_count_', '', basename($argv[0]));
+$mysqlFile      = empty(getenv("mysql_file")) ? DEFAULT_MYSQL_FILE : getenv("mysql_file");
+$defaultsFile   = empty(getenv("defaults_file")) ? DEFAULT_DEFAULTS_FILE : getenv("defaults_file");
+
+$cachePeriodInSeconds = empty(getenv("{$table}_cache_period_in_seconds"))
+    ? DEFAULT_CACHE_PERIOD
+    : intval(getenv("{$table}_cache_period_in_seconds"));
+
+/**
+ * Function return count of rows for the given table
+ *
+ * @param string $table The table name
+ * @return int Return count of rows for the given table
+ */
+function getRowsCount ($table) {
+    global $defaultsFile;
+
+    $result = exec("mysql --defaults-file=$defaultsFile -e 'SELECT COUNT(*) FROM $table;'");
+
+    return intval($result);
+}
+
+/**
+ * Function try to read data from cache. If cache not found or expired use getRowsCount function to get actual value
+ *
+ * @param string $table The table name
+ * @return int Return rows count
+ */
+function getRowsCountFromCache ($table) {
+    global $cachePeriodInSeconds, $table;
+
+    $cacheFileName = "/tmp/monitoring_munin_mysql_row_count_$table.json";
+
+    // We should read data from the cache if cache file exists and was modified les then $cachePeriodInSeconds seconds ago
+    $isCacheActual = file_exists($cacheFileName) && (time() - filemtime($cacheFileName) < $cachePeriodInSeconds);
+
+    // Read bucket size data from cache or get new one
+    if ($isCacheActual) {
+        $cachedData = intval(file_get_contents($cacheFileName));
+    } else {
+        $cachedData = getRowsCount($table); // Get rows count
+        file_put_contents($cacheFileName, $cachedData); // Update cache
+    }
+
+    return intval($cachedData);
+}
+
+// Processed autoconf parameter
+if(count($argv) == 2 && $argv[1] == 'autoconf') {
+    // Check if table are specified
+    if (empty($table)) {
+        exit("no (no table specified)\n");
+    }
+
+    // Check if mysql is installed
+    if (empty(shell_exec("which $mysqlFile"))) {
+        exit("no (mysql not installed)\n");
+    }
+
+    // Check if we can load bucket data
+    if (getRowsCount($table) === false || !is_int(getRowsCount($table))) {
+        exit("no (Can't get table rows count)\n");
+    }
+
+    exit("yes\n");
+}
+
+// Processed config parameter
+if(count($argv) == 2 && $argv[1] == 'config') {
+
+    # The headers
+    echo("graph_title MySQL row count: $table\n");
+    echo(sprintf("graph_category %s\n", explode('.', $table)[0]));
+    echo("graph_vlabel $table\n");
+    echo(str_replace('.', '_', $table) . ".label $table\n");
+    exit();
+}
+
+// execute plugin
+echo str_replace('.', '_', $table) . ".value " . getRowsCountFromCache($table) . "\n";

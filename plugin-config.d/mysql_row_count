@@ -1,0 +1,5 @@
+[mysql_row_count_*]
+env.mysql_file mysql
+env.defaults_file /etc/mysql/debian.cnf
+env.stack.users_cache_period_in_seconds 86400
+user root
