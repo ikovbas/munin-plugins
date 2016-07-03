@@ -23,7 +23,7 @@ function getBucketSize ($bucket) {
     global $awsFile;
 
     // Prepare command
-    $command = sprintf("$awsFile s3api list-objects --bucket $bucket --output json --query \"sum(Contents[].Size)\"");
+    $command = "$awsFile s3api list-objects --bucket $bucket --output json --query \"sum(Contents[].Size)\"";
 
     // Run command and remove \n from end of the lone
     $result = rtrim(shell_exec($command));
