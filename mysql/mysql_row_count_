@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 
-const DEFAULT_CACHE_PERIOD  = 86400; // 1 * 60 * 60 (1 hour)
+const DEFAULT_CACHE_PERIOD  = 360; // 1 * 60 * 60 (1 hour)
 const DEFAULT_DEFAULTS_FILE = '/etc/mysql/debian.cnf';
 const DEFAULT_MYSQL_FILE    = 'mysql';
 
